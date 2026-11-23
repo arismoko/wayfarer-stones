@@ -12,19 +12,19 @@ mod screen;
 mod server;
 
 use mod_api::{
-    BlockState, ClientHost, LevelHost, ServerHost,
-    BlockChangedEvent, BlockPart, BlocksEvent, BreakBlockEvent, ClientTickPostEvent, Flow, Hooks, HostSide,
-    InteractionResult, ItemPart, ItemsEvent, OnBlockPlacedByEvent, RegisterCommandsEvent, Registrar,
-    RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ScreenCharTypedPreEvent,
-    ScreenKeyPressedPreEvent, ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent,
-    ScreenRenderPostEvent, ServerTickEvent, StateForPlacementEvent, UseItemEvent, UseOnEvent,
+    BlockChangedEvent, BlockPart, BlockState, BlocksEvent, BreakBlockEvent, ClientHost,
+    ClientTickPostEvent, Flow, Hooks, HostSide, InteractionResult, ItemPart, ItemsEvent, LevelHost,
+    LevelSide, OnBlockPlacedByEvent, RegisterCommandsEvent, Registrar, RegistrationContext,
+    RightClickBlockEvent, ScreenCharTypedPreEvent, ScreenKeyPressedPreEvent,
+    ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
+    ServerHost, ServerTickEvent, StateForPlacementEvent, UseItemEvent, UseOnEvent,
     WorldLifecycleEvent,
 };
 
 #[derive(Default)]
 struct Mod;
 
-#[mod_api::horizon_mod]
+#[mod_api::sunrise_mod]
 impl Hooks for Mod {
     fn register(&self, r: &mut dyn Registrar, _: &RegistrationContext) {
         server::register(r);
@@ -35,19 +35,15 @@ impl Hooks for Mod {
     }
 
     fn blocks(&self, _: &RegistrationContext, event: &mut BlocksEvent<'_>) {
-        server::blocks(event.blocks);
+        server::blocks(event);
     }
 
     fn items(&self, _: &RegistrationContext, event: &mut ItemsEvent<'_>) {
-        server::items(event.items);
+        server::items(event);
     }
 
     fn register_commands(&self, _: &mut dyn ServerHost, event: &mut RegisterCommandsEvent<'_>) {
         server::commands(event.commands);
-    }
-
-    fn run_mod_command(&self, host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>) -> Flow {
-        server::command(host, event)
     }
 
     fn right_click_block(&self, host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> Flow {
@@ -63,7 +59,11 @@ impl Hooks for Mod {
     }
 
     fn break_block(&self, host: &mut dyn ServerHost, event: &mut BreakBlockEvent<'_>) -> Flow {
-        if server::destroyed(host, event.pos) { Flow::Cancel } else { Flow::Continue }
+        if server::destroyed(host, event.pos) {
+            Flow::Cancel
+        } else {
+            Flow::Continue
+        }
     }
 
     fn block_changed(&self, level: &dyn LevelHost, event: &mut BlockChangedEvent) {
@@ -77,7 +77,10 @@ impl Hooks for Mod {
     }
 
     fn world_lifecycle(&self, _: &mut dyn ServerHost, event: &mut WorldLifecycleEvent<'_>) {
-        if matches!(event.phase, mod_api::WorldPhase::WorldCloseFinal | mod_api::WorldPhase::WorldCloseFailed) {
+        if matches!(
+            event.phase,
+            mod_api::WorldPhase::WorldCloseFinal | mod_api::WorldPhase::WorldCloseFailed
+        ) {
             server::close_world();
         }
     }
@@ -94,15 +97,27 @@ impl Hooks for Mod {
         screen::flow(screen::mouse_pressed(host, event.screen, event.button))
     }
 
-    fn screen_mouse_scrolled_pre(&self, host: &dyn ClientHost, event: &mut ScreenMouseScrolledPreEvent<'_>) -> Flow {
+    fn screen_mouse_scrolled_pre(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut ScreenMouseScrolledPreEvent<'_>,
+    ) -> Flow {
         screen::flow(screen::mouse_scrolled(host, event.screen, event.scroll))
     }
 
-    fn screen_key_pressed_pre(&self, host: &dyn ClientHost, event: &mut ScreenKeyPressedPreEvent<'_>) -> Flow {
+    fn screen_key_pressed_pre(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut ScreenKeyPressedPreEvent<'_>,
+    ) -> Flow {
         screen::flow(screen::key_pressed(host, event.screen, event.key))
     }
 
-    fn screen_char_typed_pre(&self, host: &dyn ClientHost, event: &mut ScreenCharTypedPreEvent<'_>) -> Flow {
+    fn screen_char_typed_pre(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut ScreenCharTypedPreEvent<'_>,
+    ) -> Flow {
         screen::flow(screen::char_typed(host, event.screen, event.c))
     }
 
@@ -114,22 +129,27 @@ impl Hooks for Mod {
 /// The stone's lower block.
 struct StoneBlock;
 
-#[mod_api::horizon_part]
+#[mod_api::sunrise_part]
 impl BlockPart for StoneBlock {
     /// A stone needs room for its upper block: none where there is none.
     fn state_for_placement(
         &self,
-        level: &dyn LevelHost,
-        event: &mut StateForPlacementEvent,
+        level: LevelSide<'_>,
+        event: &mut StateForPlacementEvent<'_>,
     ) -> Option<Option<BlockState>> {
-        if server::room_above(level, event.context.pos) { None } else { Some(None) }
+        let (LevelSide::Server(level) | LevelSide::Client(level)) = level;
+        if server::room_above(level, event.context.pos) {
+            None
+        } else {
+            Some(None)
+        }
     }
 }
 
 /// The stone's item: the owner's limit before it is placed, and the registry once it is.
 struct StoneItem;
 
-#[mod_api::horizon_part]
+#[mod_api::sunrise_part]
 impl ItemPart for StoneItem {
     fn use_on(&self, host: HostSide<'_>, event: &mut UseOnEvent) -> Option<InteractionResult> {
         let HostSide::Server(host) = host else {
@@ -148,7 +168,7 @@ impl ItemPart for StoneItem {
 /// The wayfarer's scroll: opens the screen from anywhere.
 struct Scroll;
 
-#[mod_api::horizon_part]
+#[mod_api::sunrise_part]
 impl ItemPart for Scroll {
     fn use_item(&self, host: HostSide<'_>, event: &mut UseItemEvent) -> Option<InteractionResult> {
         let HostSide::Server(host) = host else {

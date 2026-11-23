@@ -1,0 +1,14 @@
+# Wayfarer Stones for Sunrise: native code in src/ with its data/ and assets/.
+id = "wayfarer_stones"
+name = "Wayfarer Stones"
+version = "0.9.0"
+description = "Place waystones around your world, activate them, and travel between the ones you know."
+authors = ["bioneisme"]
+license = "MIT"
+credits = "Ported to Sunrise by arismoko."
+homepage = "https://github.com/arismoko/wayfarer-stones"
+side = "both"
+
+[native]
+game = "26.3"
+sunrise = "7cfdf81463ebb4a19705768273909f7f3f03601d"

@@ -1,0 +1,21 @@
+summary = "Place waystones around your world, activate them, and travel between the ones you know."
+description = """
+Place waystones around your world, activate them, and travel between the ones you know.
+
+Wayfarer Stones by bioneisme, for [Sunrise](https://playsunrise.net) (Minecraft Java 26.3), written in Rust on Sunrise's mod API.
+
+What it does:
+
+- Craft and place a two-block Wayfarer Stone; it gets a name you can change, and right-clicking it once adds it to your list.
+- Right-click a stone to pick a destination on its screen, or search for one; you land beside the stone, or on top if its sides are blocked, and never somewhere unsafe.
+- A Wayfarer's Scroll opens the same screen from anywhere and is used up by the travel.
+- Villages get a stone of their own, in plains, desert, savanna, snowy and taiga styles.
+- Travel costs experience by distance (more between dimensions), with a cooldown; every cost, limit and rule is a per-world setting.
+- `/wayfarer` commands to list, travel, rename and forget stones; operators can make a stone known to everyone or remove one.
+- English and Russian text.
+"""
+categories = ["transportation", "utility"]
+
+[[screenshots]]
+path = "page/stone.png"
+caption = "A Wayfarer Stone and its travel screen."

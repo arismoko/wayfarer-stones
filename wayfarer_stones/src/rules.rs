@@ -19,9 +19,9 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Display};
 
-/// The mod's id (`horizon-mod.toml`) and its own screen's owner. Its blocks, items and files are in the namespace
+/// The mod's id (`sunrise-mod.toml`) and its own screen's owner. Its blocks, items and files are in the namespace
 /// `wayfarer_stones`, which the manifest lists.
-pub const ID: &str = "wayfarer_stones_native";
+pub const ID: &str = "wayfarer_stones";
 /// The block and the item the mod declares, in its namespace.
 pub const BLOCK: &str = "wayfarer_stones:wayfarer_stone";
 /// A stone's upper block. Its own block, not a state of `BLOCK`: a village's
@@ -30,9 +30,7 @@ pub const BLOCK: &str = "wayfarer_stones:wayfarer_stone";
 pub const TOP: &str = "wayfarer_stones:wayfarer_stone_top";
 pub const SCROLL: &str = "wayfarer_stones:wayfarers_scroll";
 /// The folder of the mod's files in a world's folder.
-pub const DIR: &str = "horizon-wayfarer-stones";
-/// The commands the mod registers (their first word).
-pub const COMMANDS: [&str; 1] = ["wayfarer"];
+pub const DIR: &str = "wayfarer-stones";
 /// Mod messages: the server's list of stones, and the client's requests.
 pub const CHANNEL_LIST: &str = "wayfarer_stones:list";
 pub const CHANNEL_ACT: &str = "wayfarer_stones:act";
@@ -233,7 +231,10 @@ pub enum Out {
     Open,
     /// Travel to this stone (the glue queues it), using up a wayfarer's scroll
     /// when `scroll` says so.
-    Travel { id: u64, scroll: bool },
+    Travel {
+        id: u64,
+        scroll: bool,
+    },
 }
 
 /// The world's stones, who knows them, and the config.
@@ -287,11 +288,7 @@ impl Registry {
     }
 
     pub fn owned_by(&self, uuid: &str) -> usize {
-        self.data
-            .stones
-            .iter()
-            .filter(|w| w.owner == uuid)
-            .count()
+        self.data.stones.iter().filter(|w| w.owner == uuid).count()
     }
 
     /// Whether `actor` may place one more stone.
@@ -556,7 +553,10 @@ impl Registry {
                 if known.is_empty() {
                     return vec![Out::Reply(msg("wayfarer_stones.list.none", &[]))];
                 }
-                let mut out = vec![Out::Reply(msg("wayfarer_stones.list.count", &[&known.len()]))];
+                let mut out = vec![Out::Reply(msg(
+                    "wayfarer_stones.list.count",
+                    &[&known.len()],
+                ))];
                 for w in known {
                     let key = if w.global {
                         "wayfarer_stones.list.row_global"
@@ -593,7 +593,10 @@ impl Registry {
                     return vec![Out::Error(msg("wayfarer_stones.usage.name", &[]))];
                 }
                 let Some(id) = self.near(actor, dimension, pos).map(|w| w.id) else {
-                    return vec![Out::Error(msg("wayfarer_stones.error.stand_near", &[&NEAR]))];
+                    return vec![Out::Error(msg(
+                        "wayfarer_stones.error.stand_near",
+                        &[&NEAR],
+                    ))];
                 };
                 match self.rename(id, arg, actor) {
                     Ok(()) => vec![Out::Reply(msg("wayfarer_stones.renamed", &[&arg.trim()]))],
@@ -616,7 +619,10 @@ impl Registry {
             }
             "global" => {
                 if actor.level < 2 {
-                    return vec![Out::Error(msg("wayfarer_stones.error.operator_global", &[]))];
+                    return vec![Out::Error(msg(
+                        "wayfarer_stones.error.operator_global",
+                        &[],
+                    ))];
                 }
                 let Some(w) = self.by_name(arg) else {
                     return vec![Out::Error(msg("wayfarer_stones.error.no_name", &[&arg]))];
@@ -633,14 +639,20 @@ impl Registry {
             }
             "remove" => {
                 if actor.level < 2 {
-                    return vec![Out::Error(msg("wayfarer_stones.error.operator_remove", &[]))];
+                    return vec![Out::Error(msg(
+                        "wayfarer_stones.error.operator_remove",
+                        &[],
+                    ))];
                 }
                 let Some(w) = self.by_name(arg) else {
                     return vec![Out::Error(msg("wayfarer_stones.error.no_name", &[&arg]))];
                 };
                 let (id, name) = (w.id, w.name.clone());
                 self.remove(id);
-                vec![Out::Reply(msg("wayfarer_stones.removed_from_registry", &[&name]))]
+                vec![Out::Reply(msg(
+                    "wayfarer_stones.removed_from_registry",
+                    &[&name],
+                ))]
             }
             _ => vec![Out::Error(msg("wayfarer_stones.usage.all", &[]))],
         }
@@ -798,7 +810,13 @@ fn particles_command(dimension: &str, particle: &str, [x, y, z]: [f64; 3], count
 
 /// `sound` at `at`, for the players of that dimension within earshot. The
 /// selector keeps it there: `playsound` alone reaches every dimension's players.
-fn sound_command(dimension: &str, sound: &str, [x, y, z]: [f64; 3], volume: f32, pitch: f32) -> String {
+fn sound_command(
+    dimension: &str,
+    sound: &str,
+    [x, y, z]: [f64; 3],
+    volume: f32,
+    pitch: f32,
+) -> String {
     format!(
         "execute in {dimension} positioned {x:.3} {y:.3} {z:.3} run playsound minecraft:{sound} player @a[distance=..32] {x:.3} {y:.3} {z:.3} {volume} {pitch}"
     )
@@ -1345,10 +1363,16 @@ impl Ui {
         } else if self.rename.is_some() {
             (msg("wayfarer_stones.screen.hint_rename", &[]), MUTED)
         } else if self.cooldown > 0 {
-            (msg("wayfarer_stones.screen.cooldown", &[&self.cooldown]), YELLOW)
+            (
+                msg("wayfarer_stones.screen.cooldown", &[&self.cooldown]),
+                YELLOW,
+            )
         } else if self.total > self.entries.len() {
             (
-                msg("wayfarer_stones.screen.showing", &[&self.entries.len(), &self.total]),
+                msg(
+                    "wayfarer_stones.screen.showing",
+                    &[&self.entries.len(), &self.total],
+                ),
                 YELLOW,
             )
         } else if self.needs_scroll {
@@ -1408,7 +1432,10 @@ impl Ui {
             price_color,
         ));
         if let Some(d) = e.distance.filter(|_| !e.here) {
-            let line = tr(&msg("wayfarer_stones.screen.metres", &[&(d.round() as i64)]));
+            let line = tr(&msg(
+                "wayfarer_stones.screen.metres",
+                &[&(d.round() as i64)],
+            ));
             let width = measure(&line);
             out.push(Draw::Text(line, [right - width, r[1] + 13.0], MUTED));
         }
@@ -1613,9 +1640,8 @@ impl Registry {
         if !self.changed {
             return Ok(());
         }
-        let json = |name: &str, value: &dyn erased::Json| {
-            value.json().map_err(|e| format!("{name}: {e}"))
-        };
+        let json =
+            |name: &str, value: &dyn erased::Json| value.json().map_err(|e| format!("{name}: {e}"));
         let stones = json(STONES_FILE, &self.data)?;
         let players = json(PLAYERS_FILE, &self.players)?;
         files.stage(STONES_FILE, &stones)?;
@@ -1669,7 +1695,10 @@ mod tests {
             if self.fail_commit == Some(name) {
                 return Err(format!("{name}: rename failed"));
             }
-            let bytes = self.staged.remove(name).ok_or(format!("{name}: not staged"))?;
+            let bytes = self
+                .staged
+                .remove(name)
+                .ok_or(format!("{name}: not staged"))?;
             self.files.insert(name.into(), bytes);
             Ok(())
         }
@@ -1677,17 +1706,23 @@ mod tests {
 
     impl Disk {
         fn stones(&self) -> Option<Data> {
-            self.files.get(STONES_FILE).map(|b| serde_json::from_slice(b).unwrap())
+            self.files
+                .get(STONES_FILE)
+                .map(|b| serde_json::from_slice(b).unwrap())
         }
         fn players(&self) -> Option<Players> {
-            self.files.get(PLAYERS_FILE).map(|b| serde_json::from_slice(b).unwrap())
+            self.files
+                .get(PLAYERS_FILE)
+                .map(|b| serde_json::from_slice(b).unwrap())
         }
     }
 
     /// A registry with one stone the player `a` knows.
     fn found_one() -> Registry {
         let mut r = Registry::new(Config::default(), Data::default(), Players::default());
-        let id = r.place("minecraft:overworld", [0, 64, 0], &actor("a", 0), 0).id;
+        let id = r
+            .place("minecraft:overworld", [0, 64, 0], &actor("a", 0), 0)
+            .id;
         r.activate("a", id);
         assert!(r.changed);
         r
@@ -1696,7 +1731,10 @@ mod tests {
     #[test]
     fn a_save_whose_first_write_fails_is_retried() {
         let mut r = found_one();
-        let mut disk = Disk { fail_stage: Some(STONES_FILE), ..Disk::default() };
+        let mut disk = Disk {
+            fail_stage: Some(STONES_FILE),
+            ..Disk::default()
+        };
         assert!(r.save(&mut disk).is_err());
         assert!(r.changed, "still to write");
         assert!(disk.files.is_empty());
@@ -1710,7 +1748,10 @@ mod tests {
     #[test]
     fn a_save_whose_second_write_fails_leaves_the_old_pair_and_is_retried() {
         let mut r = found_one();
-        let mut disk = Disk { fail_stage: Some(PLAYERS_FILE), ..Disk::default() };
+        let mut disk = Disk {
+            fail_stage: Some(PLAYERS_FILE),
+            ..Disk::default()
+        };
         assert!(r.save(&mut disk).is_err());
         assert!(r.changed, "still to write");
         assert!(disk.files.is_empty(), "neither file is put in place alone");
@@ -1724,7 +1765,10 @@ mod tests {
     #[test]
     fn a_failed_rename_never_leaves_players_naming_a_stone_the_stones_file_lacks() {
         let mut r = found_one();
-        let mut disk = Disk { fail_commit: Some(PLAYERS_FILE), ..Disk::default() };
+        let mut disk = Disk {
+            fail_commit: Some(PLAYERS_FILE),
+            ..Disk::default()
+        };
         assert!(r.save(&mut disk).is_err());
         assert!(r.changed, "still to write");
         // The stones go in place first, so every id players.json names is one
@@ -1736,7 +1780,10 @@ mod tests {
         assert!(!r.changed);
         assert_eq!(disk.players().unwrap().known["a"].len(), 1);
 
-        let mut disk = Disk { fail_commit: Some(STONES_FILE), ..Disk::default() };
+        let mut disk = Disk {
+            fail_commit: Some(STONES_FILE),
+            ..Disk::default()
+        };
         r.changed = true;
         assert!(r.save(&mut disk).is_err());
         assert!(r.changed, "still to write");
@@ -1804,14 +1851,11 @@ mod tests {
     #[test]
     fn every_line_is_in_both_languages_with_the_same_arguments() {
         let (en, ru) = (language("en_us"), language("ru_ru"));
-        let used: std::collections::BTreeSet<String> = [
-            "src/rules.rs",
-            "src/server.rs",
-            "src/screen.rs",
-        ]
-        .iter()
-        .flat_map(|s| keys_in(&file(s)))
-        .collect();
+        let used: std::collections::BTreeSet<String> =
+            ["src/rules.rs", "src/server.rs", "src/screen.rs"]
+                .iter()
+                .flat_map(|s| keys_in(&file(s)))
+                .collect();
         assert!(used.len() > 40, "{used:?}");
         for key in &used {
             assert!(en.contains_key(key), "{key} isn't in en_us");
@@ -1841,7 +1885,10 @@ mod tests {
             let path = format!("data/wayfarer_stones/loot_table/blocks/{name}.json");
             let table: serde_json::Value = serde_json::from_str(&file(&path)).unwrap();
             let pool = &table["pools"][0];
-            assert_eq!(pool["condition"]["type"], "minecraft:survives_explosion", "{name}");
+            assert_eq!(
+                pool["condition"]["type"], "minecraft:survives_explosion",
+                "{name}"
+            );
             assert_eq!(pool["rolls"], 1, "{name}");
             assert_eq!(pool["entries"][0]["name"], BLOCK, "{name}");
         }
@@ -1849,7 +1896,8 @@ mod tests {
 
     #[test]
     fn a_nested_line_survives_a_message() {
-        let m = msg("wayfarer_stones.list.row", &[&"Home"]).and(msg("wayfarer_stones.place.end", &[&1, &2, &3]));
+        let m = msg("wayfarer_stones.list.row", &[&"Home"])
+            .and(msg("wayfarer_stones.place.end", &[&1, &2, &3]));
         let back: Msg = serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
         assert_eq!(back, m);
         assert_eq!(english(&m), "  Home: End 1, 2, 3");
@@ -1942,7 +1990,11 @@ mod tests {
                 return None;
             }
             let listed = cells.iter().find(|(at, _)| *at == pos).map(|(_, c)| *c);
-            Some(listed.unwrap_or(if pos[1] < 64 { Cell::Solid } else { Cell::Passable }))
+            Some(listed.unwrap_or(if pos[1] < 64 {
+                Cell::Solid
+            } else {
+                Cell::Passable
+            }))
         }
     }
 
@@ -1990,7 +2042,10 @@ mod tests {
     #[test]
     fn an_unloaded_stone_is_unknown_not_blocked() {
         let w = reg().place(OW, [0, 64, 0], &actor("a", 0), 0);
-        assert_eq!(landing_spot(&w, &world(vec![], Some(-100))), Landing::Unknown);
+        assert_eq!(
+            landing_spot(&w, &world(vec![], Some(-100))),
+            Landing::Unknown
+        );
         // Solid sides, and the top in a chunk not loaded: unknown too.
         let walls = [[0, 1], [0, -1], [1, 0], [-1, 0]]
             .iter()
@@ -2018,7 +2073,11 @@ mod tests {
         let draws = u.render(centre(g.row(0)), false, &measure, &english);
         assert!(!draws.contains(&Draw::Fill(g.row(0), ROW_HOVER)));
         let wanted = english(&msg("wayfarer_stones.screen.cooldown", &[&4]));
-        assert!(draws.iter().any(|d| matches!(d, Draw::Text(t, ..) if *t == wanted)));
+        assert!(
+            draws
+                .iter()
+                .any(|d| matches!(d, Draw::Text(t, ..) if *t == wanted))
+        );
         // Once it is over, a click travels.
         u.cooldown = 0;
         u.filter.clear();
@@ -2421,10 +2480,13 @@ mod tests {
                     Draw::Text(t, ..) => Some(t),
                     _ => None,
                 })
-                .last()
+                .next_back()
         };
         let mut u = ui(vec![entry(1, "Alpha")]);
-        assert_eq!(line(&u), Some(english(&msg("wayfarer_stones.screen.hint", &[]))));
+        assert_eq!(
+            line(&u),
+            Some(english(&msg("wayfarer_stones.screen.hint", &[])))
+        );
         u.needs_scroll = true;
         assert_eq!(
             line(&u),
@@ -2437,7 +2499,11 @@ mod tests {
         let draws = ui(vec![]).render([0.0, 0.0], false, &measure, &english);
         let line = english(&msg("wayfarer_stones.screen.empty", &[]));
         let line = fit(&line, Geometry::new([480.0, 270.0]).list[2] - 8.0, &measure);
-        assert!(draws.iter().any(|d| matches!(d, Draw::Text(t, ..) if *t == line)));
+        assert!(
+            draws
+                .iter()
+                .any(|d| matches!(d, Draw::Text(t, ..) if *t == line))
+        );
     }
 
     #[test]
@@ -2573,7 +2639,10 @@ mod tests {
             Err(msg("wayfarer_stones.error.only_operator_renames", &[]))
         );
         assert!(r.rename(w.id, "Square", &op).is_ok());
-        assert_eq!(r.at(OW, [5, 70, 5]).map(|w| w.name.as_str()), Some("Square"));
+        assert_eq!(
+            r.at(OW, [5, 70, 5]).map(|w| w.name.as_str()),
+            Some("Square")
+        );
         assert!(r.broken(OW, [5, 70, 5], &a).unwrap().is_some());
         // Another stone never gets the same id.
         assert_ne!(r.discover(OW, [6, 70, 5], 9).id, w.id);

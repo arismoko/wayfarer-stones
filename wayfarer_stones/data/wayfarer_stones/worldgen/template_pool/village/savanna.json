@@ -1,5 +1,5 @@
 {
-  "horizon:add_to": "minecraft:village/savanna/houses",
+  "sunrise:add_to": "minecraft:village/savanna/houses",
   "elements": [
     {
       "weight": 1,

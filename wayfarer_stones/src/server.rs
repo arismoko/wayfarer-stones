@@ -2,10 +2,11 @@
 
 use crate::rules;
 use mod_api::{
-    Block, BlockChangedEvent, BlockKey, BlockProperties, BlockShapes, Command, CommandArgumentValue,
-    CommandSource, Flow, IPayloadContext, IPayloadHandler, Identifier, Item, ItemKey, LevelRef, PayloadBytes,
-    LevelDimension, LevelHost, PayloadHandleError, PayloadId, PlayerRef, PushReaction, Rarity, Registrar,
-    RunModCommandEvent, ServerHost, Text, text::TextStyle,
+    Block, BlockChangedEvent, BlockKey, BlockProperties, BlockShapes, BlocksEvent, Command,
+    CommandArgumentValue, CommandInvocation, CommandRegistration, CommandSource, IPayloadContext,
+    IPayloadHandler, Identifier, Item, ItemKey, ItemsEvent, LevelDimension, LevelHost, LevelRef,
+    PayloadBytes, PayloadHandleError, PayloadId, PlayerRef, PushReaction, Rarity, Registrar,
+    ServerHost, Text, text::TextStyle,
 };
 use std::{
     collections::HashMap,
@@ -31,7 +32,8 @@ pub(crate) struct Keys {
 static KEYS: OnceLock<Keys> = OnceLock::new();
 
 pub(crate) fn keys() -> &'static Keys {
-    KEYS.get().expect("the mod's keys are looked up at registration")
+    KEYS.get()
+        .expect("the mod's keys are looked up at registration")
 }
 
 /// Looks the keys up and registers the mod messages.
@@ -46,7 +48,10 @@ pub(crate) fn register(r: &mut dyn Registrar) {
     let mut payloads = r.payload_handlers();
     let mut view = payloads.registrar("1");
     view.play_to_server(PayloadId(rules::CHANNEL_ACT.into()), Arc::new(FromClient));
-    view.play_to_client(PayloadId(rules::CHANNEL_LIST.into()), Some(Arc::new(crate::screen::FromServer)));
+    view.play_to_client(
+        PayloadId(rules::CHANNEL_LIST.into()),
+        Some(Arc::new(crate::screen::FromServer)),
+    );
 }
 
 // ---- the world's state ---------------------------------------------------------
@@ -86,7 +91,14 @@ fn now_ms() -> i64 {
 /// `8-4-4-4-12` hex, as `players.json` keys and the owners are written.
 fn uuid_string(u: u128) -> String {
     let h = format!("{u:032x}");
-    format!("{}-{}-{}-{}-{}", &h[..8], &h[8..12], &h[12..16], &h[16..20], &h[20..])
+    format!(
+        "{}-{}-{}-{}-{}",
+        &h[..8],
+        &h[8..12],
+        &h[12..16],
+        &h[16..20],
+        &h[20..]
+    )
 }
 
 /// A JSON document: its default when the file doesn't exist, an error when it exists but can't be
@@ -131,7 +143,8 @@ impl rules::SaveFiles for Folder<'_> {
 fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), String> {
     let dir = path.parent().unwrap_or(Path::new("."));
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-    let mut bytes = serde_json::to_vec_pretty(value).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut bytes =
+        serde_json::to_vec_pretty(value).map_err(|e| format!("{}: {e}", path.display()))?;
     bytes.push(b'\n');
     let mut folder = Folder(dir);
     rules::SaveFiles::stage(&mut folder, name, &bytes)?;
@@ -180,7 +193,11 @@ fn open(dir: PathBuf) -> State {
     if let Some(e) = &broken {
         log::error!("[wayfarer_stones] can't read {e}: the mod is read-only until it is fixed");
     } else {
-        log::info!("[wayfarer_stones] {} stone(s) in {}", data.stones.len(), dir.display());
+        log::info!(
+            "[wayfarer_stones] {} stone(s) in {}",
+            data.stones.len(),
+            dir.display()
+        );
     }
     State {
         dir,
@@ -200,7 +217,7 @@ fn lock() -> MutexGuard<'static, Option<State>> {
     STATE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// The state of the world in `dir` (`<world>/horizon-wayfarer-stones/`), opened on first use and
+/// The state of the world in `dir` (`<world>/wayfarer-stones/`), opened on first use and
 /// again when another world opens.
 fn state(dir: PathBuf) -> MutexGuard<'static, Option<State>> {
     let mut state = lock();
@@ -282,7 +299,7 @@ fn pl(host: &dyn ServerHost, player: PlayerRef) -> Option<Pl> {
     Some(Pl {
         player,
         uuid: player.uuid(),
-        name: player.name(host)?,
+        name: player.name(host)?.to_owned(),
         level: player.permission_level(host).unwrap_or(0),
         dimension: identifier(&player.dimension(host)?),
         position: player.entity().position(host)?,
@@ -341,7 +358,7 @@ fn tell(host: &mut dyn ServerHost, player: PlayerRef, line: Text) {
 /// neighbours' faces, which a model narrower than a cube needs. A piston neither moves nor crushes
 /// them, so it never parts the two. The lower block has the item. Textures, models, the language
 /// files, the loot tables, the recipes and the villages are this package's `assets/` and `data/`.
-pub(crate) fn blocks(blocks: &mut Vec<Block>) {
+pub(crate) fn blocks(event: &mut BlocksEvent<'_>) {
     for (id, item) in [(rules::BLOCK, true), (rules::TOP, false)] {
         // Narrower than a block, as tall as one: a player stands on top.
         let shape = vec![[0.125, 0.0, 0.125, 0.875, 1.0, 0.875]];
@@ -360,27 +377,35 @@ pub(crate) fn blocks(blocks: &mut Vec<Block>) {
             values: std::collections::BTreeMap::new(),
             default: Some(shape),
         });
-        blocks.push(block);
+        // A refused declaration is reported at startup with its reason.
+        let _ = event.register(block);
     }
 }
 
 /// The wayfarer's scroll: paper that opens the menu from anywhere and is used up by the travel.
-pub(crate) fn items(items: &mut Vec<Item>) {
+pub(crate) fn items(event: &mut ItemsEvent<'_>) {
     let mut scroll = Item::new(rules::SCROLL, "minecraft:paper");
     scroll.max_stack_size = Some(16);
     scroll.rarity = Some(Rarity::Uncommon);
-    items.push(scroll);
+    // A refused declaration is reported at startup with its reason.
+    let _ = event.register(scroll);
 }
 
 /// The commands in every player's command tree.
-pub(crate) fn commands(commands: &mut Vec<Command>) {
-    commands.push(Command::new("wayfarer"));
-    commands.push(Command::new("wayfarer list"));
-    commands.push(Command::new("wayfarer to <name:text>"));
-    commands.push(Command::new("wayfarer name <name:text>"));
-    commands.push(Command::new("wayfarer forget <name:text>"));
-    commands.push(Command::op("wayfarer global <name:text>", 2));
-    commands.push(Command::op("wayfarer remove <name:text>", 2));
+pub(crate) fn commands(commands: &mut Vec<CommandRegistration>) {
+    let usages = [
+        Command::new("wayfarer"),
+        Command::new("wayfarer list"),
+        Command::new("wayfarer to <name:text>"),
+        Command::new("wayfarer name <name:text>"),
+        Command::new("wayfarer forget <name:text>"),
+        Command::op("wayfarer global <name:text>", 2),
+        Command::op("wayfarer remove <name:text>", 2),
+    ];
+    for usage in usages {
+        commands
+            .push(usage.executes(|host, source, invocation| Ok(command(host, source, invocation))));
+    }
 }
 
 // ---- blocks in the world -------------------------------------------------------
@@ -406,7 +431,9 @@ pub(crate) fn room_above(level: &dyn LevelHost, pos: mod_api::BlockPos) -> bool 
     let Some(above) = level.block_state([pos.x, pos.y + 1, pos.z]) else {
         return true;
     };
-    level.block_in_tag(above.block(), "minecraft:replaceable").unwrap_or(true)
+    level
+        .block_in_tag(above.block(), "minecraft:replaceable")
+        .unwrap_or(true)
 }
 
 /// The dimension's id, as the rules keep it.
@@ -420,9 +447,14 @@ fn cell(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> Option<rules::
         return None;
     }
     let state = level.block_state(host, pos)?;
-    Some(match state.block().id(host).as_str() {
+    Some(match state.block().id(host)? {
         "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire" => rules::Cell::Hazard,
-        _ if host.block_in_tag(state.block(), "minecraft:replaceable").unwrap_or(false) => rules::Cell::Passable,
+        _ if host
+            .block_in_tag(state.block(), "minecraft:replaceable")
+            .unwrap_or(false) =>
+        {
+            rules::Cell::Passable
+        }
         _ => rules::Cell::Solid,
     })
 }
@@ -445,10 +477,17 @@ fn send_list(
         total: 0,
         notice,
         scroll: st.reg.needs_scroll(here),
-        cooldown_ms: st.cooldowns.get(&p.uuid).map_or(0, |until| (until - now_ms()).max(0)),
+        cooldown_ms: st
+            .cooldowns
+            .get(&p.uuid)
+            .map_or(0, |until| (until - now_ms()).max(0)),
     });
     p.player
-        .send_payload(host, &PayloadId(rules::CHANNEL_LIST.into()), PayloadBytes(data))
+        .send_payload(
+            host,
+            &PayloadId(rules::CHANNEL_LIST.into()),
+            PayloadBytes(data),
+        )
         .map(drop)
         .map_err(|e| format!("{e:?}"))
 }
@@ -456,12 +495,23 @@ fn send_list(
 /// Queues a travel, after the config's warmup.
 fn queue_travel(host: &mut dyn ServerHost, st: &mut State, p: &Pl, to: u64, scroll: bool) {
     let Some(w) = st.reg.get(to) else {
-        tell(host, p.player, red(rules::msg("wayfarer_stones.travel.gone", &[])));
+        tell(
+            host,
+            p.player,
+            red(rules::msg("wayfarer_stones.travel.gone", &[])),
+        );
         return;
     };
-    let left = st.cooldowns.get(&p.uuid).map_or(0, |until| rules::seconds_left(*until, now_ms()));
+    let left = st
+        .cooldowns
+        .get(&p.uuid)
+        .map_or(0, |until| rules::seconds_left(*until, now_ms()));
     if left > 0 {
-        tell(host, p.player, red(rules::msg("wayfarer_stones.travel.cooldown", &[&left])));
+        tell(
+            host,
+            p.player,
+            red(rules::msg("wayfarer_stones.travel.cooldown", &[&left])),
+        );
         return;
     }
     let cost = st.reg.cost((p.dimension.as_str(), p.position), w);
@@ -479,7 +529,14 @@ fn queue_travel(host: &mut dyn ServerHost, st: &mut State, p: &Pl, to: u64, scro
     });
     if warmup > 0 {
         let seconds = st.reg.config.warmup_seconds;
-        tell(host, p.player, gold(rules::msg("wayfarer_stones.travel.warmup", &[&name, &seconds])));
+        tell(
+            host,
+            p.player,
+            gold(rules::msg(
+                "wayfarer_stones.travel.warmup",
+                &[&name, &seconds],
+            )),
+        );
     }
 }
 
@@ -513,9 +570,14 @@ pub(crate) fn placed(host: &mut dyn ServerHost, player: PlayerRef, pos: [i32; 3]
     };
     let st = guard.as_mut().expect("opened");
     let w = st.reg.place(&who.dimension, pos, &actor(&who), now_ms());
-    st.commands.push(rules::upper_block_command(&who.dimension, pos));
+    st.commands
+        .push(rules::upper_block_command(&who.dimension, pos));
     drop(guard);
-    tell(host, player, green(rules::msg("wayfarer_stones.placed", &[&w.name])));
+    tell(
+        host,
+        player,
+        green(rules::msg("wayfarer_stones.placed", &[&w.name])),
+    );
 }
 
 /// A block changed, whoever changed it (a player, `/fill`, `/setblock`): a stone doesn't outlive its
@@ -542,10 +604,16 @@ pub(crate) fn block_changed(level: &dyn LevelHost, event: &BlockChangedEvent) {
             st.settling.retain(|t| t.to != id);
         }
         if named(pos.y + 1) == Some(k.top) {
-            st.commands.push(rules::remove_block_command(&dimension, [pos.x, pos.y + 1, pos.z]));
+            st.commands.push(rules::remove_block_command(
+                &dimension,
+                [pos.x, pos.y + 1, pos.z],
+            ));
         }
     } else if named(pos.y - 1) == Some(k.block) {
-        st.commands.push(rules::remove_block_command(&dimension, [pos.x, pos.y - 1, pos.z]));
+        st.commands.push(rules::remove_block_command(
+            &dimension,
+            [pos.x, pos.y - 1, pos.z],
+        ));
     }
 }
 
@@ -570,7 +638,11 @@ pub(crate) fn destroyed(host: &mut dyn ServerHost, pos: [i32; 3]) -> bool {
         Ok(Some(w)) => {
             st.pending.retain(|t| t.to != w.id);
             drop(guard);
-            tell(host, who.player, gold(rules::msg("wayfarer_stones.removed", &[&w.name])));
+            tell(
+                host,
+                who.player,
+                gold(rules::msg("wayfarer_stones.removed", &[&w.name])),
+            );
             false
         }
         Err(e) => {
@@ -595,7 +667,7 @@ pub(crate) fn right_click(host: &mut dyn ServerHost, player: u128, pos: [i32; 3]
     };
     let [x, y, z] = lower;
     let above = block_at(host, level, [x, y + 1, z]);
-    let air = above.is_some_and(|b| b.id(host) == "minecraft:air");
+    let air = above.is_some_and(|b| b.id(host) == Some("minecraft:air"));
     let Some(mut guard) = world_state(host) else {
         return true;
     };
@@ -605,7 +677,8 @@ pub(crate) fn right_click(host: &mut dyn ServerHost, player: u128, pos: [i32; 3]
         None => st.reg.discover(&who.dimension, lower, now_ms()),
     };
     if above != Some(keys().top) && air {
-        st.commands.push(rules::upper_block_command(&who.dimension, lower));
+        st.commands
+            .push(rules::upper_block_command(&who.dimension, lower));
     }
     let activated = st.reg.activate(&uuid_string(who.uuid), w.id);
     if activated {
@@ -617,7 +690,11 @@ pub(crate) fn right_click(host: &mut dyn ServerHost, player: u128, pos: [i32; 3]
     });
     drop(guard);
     if activated {
-        tell(host, who.player, green(rules::msg("wayfarer_stones.activated", &[&w.name])));
+        tell(
+            host,
+            who.player,
+            green(rules::msg("wayfarer_stones.activated", &[&w.name])),
+        );
     }
     true
 }
@@ -639,32 +716,36 @@ pub(crate) fn use_scroll(host: &mut dyn ServerHost, player: u128) -> bool {
 }
 
 /// The command line as the rules read it: its words, then its text argument.
-fn command_line(event: &RunModCommandEvent<'_>) -> String {
-    let mut line = event.command.literals.join(" ");
-    if let Some(CommandArgumentValue::String(name)) = event.command.argument("name") {
+fn command_line(invocation: &CommandInvocation) -> String {
+    let mut line = invocation.literals.join(" ");
+    if let Some(CommandArgumentValue::String(name)) = invocation.argument("name") {
         line.push(' ');
-        line.push_str(&name);
+        line.push_str(name);
     }
     line
 }
 
-/// A player's command: ours, when it is one.
-pub(crate) fn command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>) -> Flow {
-    let word = event.command.literals.first().map(String::as_str).unwrap_or_default();
-    if !rules::COMMANDS.contains(&word) {
-        return Flow::Continue;
-    }
-    let CommandSource::Player { player, .. } = event.source else {
-        let _ = host.commands().feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
-        return Flow::Cancel;
+/// A player's `/wayfarer` command; the result is the number of replies.
+fn command(
+    host: &mut dyn ServerHost,
+    source: &CommandSource,
+    invocation: &CommandInvocation,
+) -> i32 {
+    let CommandSource::Player { player, .. } = source else {
+        let _ = host
+            .commands()
+            .feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
+        return 0;
     };
     let Some(p) = pl(host, *player) else {
-        return Flow::Cancel;
+        return 0;
     };
-    let line = command_line(event);
+    let line = command_line(invocation);
     let Some(mut guard) = world_state(host) else {
-        let _ = host.commands().feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
-        return Flow::Cancel;
+        let _ = host
+            .commands()
+            .feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
+        return 0;
     };
     let st = guard.as_mut().expect("opened");
     let mut replies = Vec::new();
@@ -683,21 +764,32 @@ pub(crate) fn command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<
         }
     }
     drop(guard);
+    let count = replies.len() as i32;
     for reply in replies {
         let _ = host.commands().feedback(reply);
     }
-    Flow::Cancel
+    count
 }
 
 /// A request from a player's client, checked here as any player's input.
 struct FromClient;
 
 impl IPayloadHandler for FromClient {
-    fn handle(&self, payload: PayloadBytes, context: &mut dyn IPayloadContext) -> Result<(), PayloadHandleError> {
-        let player = context.player().map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
-        let host = context.server_host().map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
+    fn handle(
+        &self,
+        payload: PayloadBytes,
+        context: &mut dyn IPayloadContext,
+    ) -> Result<(), PayloadHandleError> {
+        let player = context
+            .player()
+            .map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
+        let host = context
+            .server_host()
+            .map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
         let Some(act) = rules::decode_act(&payload.0) else {
-            return Err(PayloadHandleError::Failed("an unreadable request from a client".into()));
+            return Err(PayloadHandleError::Failed(
+                "an unreadable request from a client".into(),
+            ));
         };
         from_client(host, player, act);
         Ok(())
@@ -721,12 +813,20 @@ fn from_client(host: &mut dyn ServerHost, player: PlayerRef, act: rules::ClientA
             };
             if session.scroll && !st.reg.config.wayfarers_scroll {
                 drop(guard);
-                tell(host, player, red(rules::msg("wayfarer_stones.error.stand_at_stone", &[])));
+                tell(
+                    host,
+                    player,
+                    red(rules::msg("wayfarer_stones.error.stand_at_stone", &[])),
+                );
             } else if st.reg.knows(&who.uuid, id) && session.here != Some(id) {
                 queue_travel(host, st, &p, id, session.scroll);
             } else {
                 drop(guard);
-                tell(host, player, red(rules::msg("wayfarer_stones.travel.refused", &[])));
+                tell(
+                    host,
+                    player,
+                    red(rules::msg("wayfarer_stones.travel.refused", &[])),
+                );
             }
         }
         rules::ClientAct::Rename { id, name } => {
@@ -786,7 +886,7 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         return;
     };
     let st = guard.as_mut().expect("opened");
-    let second = n % 20 == 0;
+    let second = n.is_multiple_of(20);
     let idle = st.pending.is_empty() && st.opens.is_empty() && st.settling.is_empty();
     if idle && st.commands.is_empty() && !second {
         return;
@@ -796,7 +896,11 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
     let players: Vec<Pl> = if idle {
         Vec::new()
     } else {
-        host.players().server_players().into_iter().filter_map(|p| pl(host, p)).collect()
+        host.players()
+            .server_players()
+            .into_iter()
+            .filter_map(|p| pl(host, p))
+            .collect()
     };
     // Screens: here, where the server's connections are back in place.
     for r in st.opens.take(n) {
@@ -810,7 +914,11 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         st.sessions.insert(p.uuid, rules::Session { scroll, here });
         if let Err(e) = send_list(host, st, p, here, true, None) {
             log::warn!("[wayfarer_stones] {e}");
-            tell(host, p.player, red(rules::msg("wayfarer_stones.screen.cant_open", &[])));
+            tell(
+                host,
+                p.player,
+                red(rules::msg("wayfarer_stones.screen.cant_open", &[])),
+            );
         }
     }
     // Players waiting on a stone for its chunks: on to the safe place, or back.
@@ -820,7 +928,7 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         .levels()
         .list_levels()
         .into_iter()
-        .filter_map(|level| Some((level.dimension().id(host)?, level)))
+        .filter_map(|level| Some((level.dimension().id(host)?.to_owned(), level)))
         .collect();
     let landing_spot = |w: &rules::Stone| match levels.get(&w.dimension) {
         Some(level) => rules::landing_spot(w, &|pos| cell(host, *level, pos)),
@@ -861,14 +969,20 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
             return false; // left
         };
         if rules::moved(&t.from, (p.dimension.as_str(), p.position)) {
-            told.push((p.player, red(rules::msg("wayfarer_stones.travel.moved", &[]))));
+            told.push((
+                p.player,
+                red(rules::msg("wayfarer_stones.travel.moved", &[])),
+            ));
             return false;
         }
         if t.due > now {
             return true;
         }
         let Some(w) = st.reg.get(t.to) else {
-            told.push((p.player, red(rules::msg("wayfarer_stones.travel.gone", &[]))));
+            told.push((
+                p.player,
+                red(rules::msg("wayfarer_stones.travel.gone", &[])),
+            ));
             return false;
         };
         go.push(Travel {
@@ -916,7 +1030,11 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         if t.cost > 0 {
             give_levels(host, t.uuid, i32::try_from(t.cost).unwrap_or(i32::MAX));
         }
-        tell_uuid(host, t.uuid, red(rules::msg("wayfarer_stones.travel.blocked", &[])));
+        tell_uuid(
+            host,
+            t.uuid,
+            red(rules::msg("wayfarer_stones.travel.blocked", &[])),
+        );
     }
     let mut travelled: Vec<u128> = Vec::new();
     let mut waits: Vec<rules::Settling> = Vec::new();
@@ -926,7 +1044,11 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
             rules::Landing::At(spot) => (spot, false),
             rules::Landing::Unknown => (t.top, true),
             rules::Landing::Blocked => {
-                tell(host, t.player, red(rules::msg("wayfarer_stones.travel.blocked", &[])));
+                tell(
+                    host,
+                    t.player,
+                    red(rules::msg("wayfarer_stones.travel.blocked", &[])),
+                );
                 continue;
             }
         };
@@ -940,18 +1062,29 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         if let Some(scroll) = &t.scroll
             && !run(host, scroll)
         {
-            tell(host, t.player, red(rules::msg("wayfarer_stones.travel.no_scroll", &[])));
+            tell(
+                host,
+                t.player,
+                red(rules::msg("wayfarer_stones.travel.no_scroll", &[])),
+            );
             continue;
         }
         // Before the player goes: `tp` moves them out of earshot of it.
         for command in &t.departure {
             run(host, command);
         }
-        if !run(host, &rules::travel_command(&t.settling.name, &t.dimension, spot)) {
+        if !run(
+            host,
+            &rules::travel_command(&t.settling.name, &t.dimension, spot),
+        ) {
             if let Some(refund) = &t.refund {
                 run(host, refund);
             }
-            tell(host, t.player, red(rules::msg("wayfarer_stones.travel.failed", &[&t.name])));
+            tell(
+                host,
+                t.player,
+                red(rules::msg("wayfarer_stones.travel.failed", &[&t.name])),
+            );
             continue;
         }
         for command in &rules::arrival_commands(&t.dimension, spot) {
@@ -964,7 +1097,11 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
         if t.cost > 0 {
             give_levels(host, t.uuid, -i32::try_from(t.cost).unwrap_or(i32::MAX));
         }
-        tell(host, t.player, green(rules::msg("wayfarer_stones.travel.done", &[&t.name])));
+        tell(
+            host,
+            t.player,
+            green(rules::msg("wayfarer_stones.travel.done", &[&t.name])),
+        );
     }
     if travelled.is_empty() {
         return;
@@ -973,7 +1110,8 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
     if let Some(st) = state.as_mut() {
         let until = now_ms() + i64::from(st.reg.config.cooldown_seconds) * 1000;
         if st.reg.config.cooldown_seconds > 0 {
-            st.cooldowns.extend(travelled.iter().map(|uuid| (*uuid, until)));
+            st.cooldowns
+                .extend(travelled.iter().map(|uuid| (*uuid, until)));
         }
         st.settling.extend(waits);
     }

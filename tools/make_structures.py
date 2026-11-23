@@ -114,7 +114,7 @@ def template(floor):
 def pool(village):
     # `guaranteed`: tried before the other houses until one stands, so a village has one.
     return {
-        "horizon:add_to": f"minecraft:village/{village}/houses",
+        "sunrise:add_to": f"minecraft:village/{village}/houses",
         "elements": [
             {
                 "weight": 1,

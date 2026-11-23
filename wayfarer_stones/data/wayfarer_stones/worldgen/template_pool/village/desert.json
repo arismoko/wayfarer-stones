@@ -1,5 +1,5 @@
 {
-  "horizon:add_to": "minecraft:village/desert/houses",
+  "sunrise:add_to": "minecraft:village/desert/houses",
   "elements": [
     {
       "weight": 1,

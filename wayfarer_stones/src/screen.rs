@@ -2,8 +2,8 @@
 
 use crate::{rules, server::line};
 use mod_api::{
-    ClientHost, Flow, IPayloadContext, IPayloadHandler, Identifier, PayloadBytes, PayloadHandleError, PayloadId,
-    ScreenRenderPostEvent, ScreenView,
+    ClientHost, Flow, IPayloadContext, IPayloadHandler, Identifier, PayloadBytes,
+    PayloadHandleError, PayloadId, ScreenRenderPostEvent, ScreenView,
 };
 use std::sync::{Mutex, MutexGuard};
 
@@ -25,18 +25,30 @@ fn ours(host: &dyn ClientHost, screen: &ScreenView) -> bool {
 }
 
 pub(crate) fn flow(consumed: bool) -> Flow {
-    if consumed { Flow::Cancel } else { Flow::Continue }
+    if consumed {
+        Flow::Cancel
+    } else {
+        Flow::Continue
+    }
 }
 
 /// The server's list: opens the screen, or refreshes the one that is open.
 pub(crate) struct FromServer;
 
 impl IPayloadHandler for FromServer {
-    fn handle(&self, payload: PayloadBytes, context: &mut dyn IPayloadContext) -> Result<(), PayloadHandleError> {
+    fn handle(
+        &self,
+        payload: PayloadBytes,
+        context: &mut dyn IPayloadContext,
+    ) -> Result<(), PayloadHandleError> {
         let Some(message) = rules::decode_list(&payload.0) else {
-            return Err(PayloadHandleError::Failed("an unreadable list from the server".into()));
+            return Err(PayloadHandleError::Failed(
+                "an unreadable list from the server".into(),
+            ));
         };
-        let host = context.client_host().map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
+        let host = context
+            .client_host()
+            .map_err(|e| PayloadHandleError::Failed(format!("{e:?}")))?;
         if message.open {
             if host.mod_screen_open(rules::ID) {
                 let ready_at = now_ms() + message.cooldown_ms;
@@ -66,7 +78,10 @@ pub(crate) fn tick(host: &mut dyn ClientHost) {
         match action {
             rules::UiAction::Send(act) => {
                 let data = rules::encode_act(&act);
-                let sent = host.send_payload_to_server(&PayloadId(rules::CHANNEL_ACT.into()), PayloadBytes(data));
+                let sent = host.send_payload_to_server(
+                    &PayloadId(rules::CHANNEL_ACT.into()),
+                    PayloadBytes(data),
+                );
                 if let Err(e) = sent
                     && let Some(open) = ui().as_mut()
                 {
@@ -93,9 +108,12 @@ pub(crate) fn render(host: &dyn ClientHost, event: &mut ScreenRenderPostEvent<'_
         let draw: &dyn mod_api::DrawContext = &*event.draw;
         open.window = draw.size();
         open.cooldown = rules::seconds_left(open.ready_at, now_ms());
-        open.render(event.screen.mouse, caret, &|text| draw.text_width(text), &|m| {
-            host.text_string(&line(m)).unwrap_or_else(|_| m.key.clone())
-        })
+        open.render(
+            event.screen.mouse,
+            caret,
+            &|text| draw.text_width(text),
+            &|m| host.text_string(&line(m)),
+        )
     };
     let draw = &mut *event.draw;
     for d in draws {
@@ -107,7 +125,10 @@ pub(crate) fn render(host: &dyn ClientHost, event: &mut ScreenRenderPostEvent<'_
             // The rules' text colours are opaque RGB.
             rules::Draw::Text(text, at, rgb) => draw.text(&text, at, 0xFF00_0000 | rgb, false),
             rules::Draw::Item(item, at, size) => {
-                if let Some(key) = Identifier::parse(item).ok().and_then(|id| host.item_key(&id)) {
+                if let Some(key) = Identifier::parse(item)
+                    .ok()
+                    .and_then(|id| host.item_key(&id))
+                {
                     draw.item(key, at, size);
                 }
             }

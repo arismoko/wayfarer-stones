@@ -1,4 +1,5 @@
 /dist
 /publish
 target/
-.horizon/
+target/
+.sunrise/

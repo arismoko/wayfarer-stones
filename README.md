@@ -1,6 +1,6 @@
 # Wayfarer Stones
 
-A mod for [Horizon](https://github.com/horizon-rust/horizon) (Minecraft: Java Edition 26.3 in Rust). Place stones around
+A mod for [Sunrise](https://playsunrise.net) (Minecraft: Java Edition 26.3). Place stones around
 your world, activate them, and travel between the ones you know.
 
 ## How to play
@@ -43,7 +43,7 @@ The text is in English and Russian, following the game's language.
 
 ## Settings
 
-Each world keeps its settings in `horizon-wayfarer-stones/config.json`, in the world's folder.
+Each world keeps its settings in `wayfarer-stones/config.json`, in the world's folder.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -62,34 +62,28 @@ Each world keeps its settings in `horizon-wayfarer-stones/config.json`, in the w
 
 ## Good to know
 
-- The mod is one native package, `wayfarer_stones_native`: its code, textures, text, recipes and villages are all in
-  it. Install it, and the launcher builds it for your Horizon. 0.8.1 is built on Nightly 2026-11-22 (2b77287), with
-  Horizon's mod API.
-- **Coming from 0.7 or older:** update `wayfarer_stones_native` (launchers from 0.2.70 no longer load the old
-  `.hnmod`), and remove the separate `wayfarer_stones` (assets) if you still have it: both use the `wayfarer_stones`
-  namespace, and the game keeps only one of them. Your stones stay: the blocks, `horizon-wayfarer-stones/` in each
-  world and its settings are the same.
+- The mod is one native package, `wayfarer_stones`: its code, textures, text, recipes and villages are all in it. Sunrise
+  builds it from source on your computer for the game build you run; this version is made for the Sunrise Dev build
+  `dev-2026-11-22-7cfdf81`.
 - Every player needs the mod to use the screen. A gamepad can close it but not click on it.
-- It runs with your account's permissions, as every native mod does.
 
 ## Build
 
-The package is the `wayfarer_stones/` folder: `horizon-mod.toml`, `Cargo.toml`, `src/`, `assets/` and `data/`. The
-repository's tools and publishing stay outside it, since a package takes only its own files.
+The package is the `wayfarer_stones/` folder: `sunrise-mod.toml`, `Cargo.toml`, `src/`, `assets/`, `data/` and its
+registry page (`page.toml`, `page/`). With the Sunrise mod tool (`cargo sunrise-mod`, from the Sunrise SDK) and Rust:
 
 ```sh
-tools/check.sh                                  # cargo check, then the rules' tests
-horizon-launcher native-build wayfarer_stones --instance NAME --trust-native-code
-cd wayfarer_stones && cargo horizon-mod build   # target/horizon-mod/wayfarer_stones_native.hmod
-python tools/game_test.py GAME_FOLDER CTL INSTANCE VERSION   # in the game, through the launcher's Play
+cd wayfarer_stones
+cargo sunrise-mod build    # target/sunrise-mod/wayfarer_stones.smod
+cargo sunrise-mod run      # builds it and starts the game with it
+cargo test                 # the rules' tests
 ```
 
-Any `cargo horizon-mod` command fetches the pinned SDK into `wayfarer_stones/.horizon/sdk/` (never committed).
-`Cargo.lock` is `horizon-launcher native-lock`'s: registry pins only, at the versions the pinned Horizon uses;
-`tools/check.sh` keeps it as it is. `cargo horizon-mod` comes from
-`cargo install --git https://github.com/horizon-rust/horizon --rev 2b77287de099c9316278ba7ac4d83590fdb7ef30 cargo-horizon-mod`.
+Any `cargo sunrise-mod` command fetches the pinned SDK into `wayfarer_stones/.sunrise/sdk/` (never committed).
 `python tools/make_textures.py` and `python tools/make_structures.py` redraw the textures and the village templates.
 
 ## License
 
 MIT
+
+Originally made for Horizon by bioneisme ([Bioneisme/wayfarer-stones](https://github.com/Bioneisme/wayfarer-stones)); ported to Sunrise by arismoko.
