@@ -732,9 +732,10 @@ fn command(
     invocation: &CommandInvocation,
 ) -> i32 {
     let CommandSource::Player { player, .. } = source else {
-        let _ = host
-            .commands()
-            .feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
+        let _ = host.commands().feedback(
+            red(rules::msg("wayfarer_stones.error.no_world", &[])),
+            false,
+        );
         return 0;
     };
     let Some(p) = pl(host, *player) else {
@@ -742,9 +743,10 @@ fn command(
     };
     let line = command_line(invocation);
     let Some(mut guard) = world_state(host) else {
-        let _ = host
-            .commands()
-            .feedback(red(rules::msg("wayfarer_stones.error.no_world", &[])));
+        let _ = host.commands().feedback(
+            red(rules::msg("wayfarer_stones.error.no_world", &[])),
+            false,
+        );
         return 0;
     };
     let st = guard.as_mut().expect("opened");
@@ -766,7 +768,7 @@ fn command(
     drop(guard);
     let count = replies.len() as i32;
     for reply in replies {
-        let _ = host.commands().feedback(reply);
+        let _ = host.commands().feedback(reply, false);
     }
     count
 }
