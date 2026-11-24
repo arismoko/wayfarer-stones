@@ -18,4 +18,8 @@ categories = ["transportation", "utility"]
 
 [[screenshots]]
 path = "page/stone.png"
-caption = "A Wayfarer Stone and its travel screen."
+caption = "A Wayfarer Stone in a plains village."
+
+[[screenshots]]
+path = "page/menu.png"
+caption = "A stone's travel screen."
