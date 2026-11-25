@@ -64,7 +64,7 @@ Each world keeps its settings in `wayfarer-stones/config.json`, in the world's f
 
 - The mod is one native package, `wayfarer_stones`: its code, textures, text, recipes and villages are all in it. Sunrise
   builds it from source on your computer for the game build you run; this version is made for the Sunrise Dev build
-  `dev-2026-11-22-7cfdf81`.
+  `dev-2026-11-25-bdad86d`.
 - Every player needs the mod to use the screen. A gamepad can close it but not click on it.
 
 ## Build

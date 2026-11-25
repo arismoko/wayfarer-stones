@@ -6,12 +6,13 @@ use mod_api::{
     CommandArgumentValue, CommandInvocation, CommandRegistration, CommandSource, IPayloadContext,
     IPayloadHandler, Identifier, Item, ItemKey, ItemsEvent, LevelDimension, LevelHost, LevelRef,
     PayloadBytes, PayloadHandleError, PayloadId, PlayerRef, PushReaction, Rarity, Registrar,
-    ServerHost, Text, text::TextStyle,
+    ServerHost, TagKey, Text, text::TextStyle,
 };
 use std::{
     collections::HashMap,
     fs,
     io::{self, Write as _},
+    ops::ControlFlow,
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, MutexGuard, OnceLock,
@@ -27,6 +28,7 @@ pub(crate) struct Keys {
     pub top: BlockKey,
     pub stone_item: ItemKey,
     pub scroll: ItemKey,
+    pub replaceable: TagKey,
 }
 
 static KEYS: OnceLock<Keys> = OnceLock::new();
@@ -43,6 +45,7 @@ pub(crate) fn register(r: &mut dyn Registrar) {
         top: r.block_key(rules::TOP),
         stone_item: r.item_key(rules::BLOCK),
         scroll: r.item_key(rules::SCROLL),
+        replaceable: r.tag_key("minecraft:replaceable"),
     };
     let _ = KEYS.set(keys);
     let mut payloads = r.payload_handlers();
@@ -432,7 +435,8 @@ pub(crate) fn room_above(level: &dyn LevelHost, pos: mod_api::BlockPos) -> bool 
         return true;
     };
     level
-        .block_in_tag(above.block(), "minecraft:replaceable")
+        .tags()
+        .block_in_tag(above.block(), keys().replaceable)
         .unwrap_or(true)
 }
 
@@ -450,7 +454,8 @@ fn cell(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> Option<rules::
     Some(match state.block().id(host)? {
         "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire" => rules::Cell::Hazard,
         _ if host
-            .block_in_tag(state.block(), "minecraft:replaceable")
+            .tags()
+            .block_in_tag(state.block(), keys().replaceable)
             .unwrap_or(false) =>
         {
             rules::Cell::Passable
@@ -926,12 +931,13 @@ pub(crate) fn tick(host: &mut dyn ServerHost) {
     // Players waiting on a stone for its chunks: on to the safe place, or back.
     let mut moves: Vec<String> = Vec::new();
     let mut undo: Vec<rules::Settling> = Vec::new();
-    let levels: HashMap<String, LevelRef> = host
-        .levels()
-        .list_levels()
-        .into_iter()
-        .filter_map(|level| Some((level.dimension().id(host)?.to_owned(), level)))
-        .collect();
+    let mut levels: HashMap<String, LevelRef> = HashMap::new();
+    let _ = host.levels().visit_levels(&mut |level| {
+        if let Some(id) = level.dimension().id(host) {
+            levels.insert(id.to_owned(), level);
+        }
+        ControlFlow::Continue(())
+    });
     let landing_spot = |w: &rules::Stone| match levels.get(&w.dimension) {
         Some(level) => rules::landing_spot(w, &|pos| cell(host, *level, pos)),
         None => rules::Landing::Unknown,

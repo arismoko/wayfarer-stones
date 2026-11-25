@@ -17,8 +17,8 @@ use mod_api::{
     LevelSide, OnBlockPlacedByEvent, RegisterCommandsEvent, Registrar, RegistrationContext,
     RightClickBlockEvent, ScreenCharTypedPreEvent, ScreenKeyPressedPreEvent,
     ScreenMouseButtonPressedPreEvent, ScreenMouseScrolledPreEvent, ScreenRenderPostEvent,
-    ServerHost, ServerTickEvent, StateForPlacementEvent, UseItemEvent, UseOnEvent,
-    WorldLifecycleEvent,
+    ServerHost, ServerStoppedEvent, ServerTickEvent, StateForPlacementEvent, UseItemEvent,
+    UseOnEvent,
 };
 
 #[derive(Default)]
@@ -76,13 +76,8 @@ impl Hooks for Mod {
         }
     }
 
-    fn world_lifecycle(&self, _: &mut dyn ServerHost, event: &mut WorldLifecycleEvent<'_>) {
-        if matches!(
-            event.phase,
-            mod_api::WorldPhase::WorldCloseFinal | mod_api::WorldPhase::WorldCloseFailed
-        ) {
-            server::close_world();
-        }
+    fn server_stopped(&self, _: &mut dyn ServerHost, _: &mut ServerStoppedEvent) {
+        server::close_world();
     }
 
     fn screen_render_post(&self, host: &dyn ClientHost, event: &mut ScreenRenderPostEvent<'_>) {
