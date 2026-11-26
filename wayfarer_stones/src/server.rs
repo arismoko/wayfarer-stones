@@ -49,7 +49,7 @@ pub(crate) fn register(r: &mut dyn Registrar) {
     };
     let _ = KEYS.set(keys);
     let mut payloads = r.payload_handlers();
-    let mut view = payloads.registrar("1");
+    let mut view = payloads.registrar("1").optional();
     view.play_to_server(PayloadId(rules::CHANNEL_ACT.into()), Arc::new(FromClient));
     view.play_to_client(
         PayloadId(rules::CHANNEL_LIST.into()),
