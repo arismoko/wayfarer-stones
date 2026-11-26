@@ -1,7 +1,7 @@
 # Wayfarer Stones for Sunrise: native code in src/ with its data/ and assets/.
 id = "wayfarer_stones"
 name = "Wayfarer Stones"
-version = "0.9.4"
+version = "0.9.5"
 description = "Place waystones around your world, activate them, and travel between the ones you know."
 authors = ["bioneisme", "arismoko"]
 license = "MIT"
@@ -11,4 +11,4 @@ side = "both"
 
 [native]
 game = "26.3"
-sunrise = "6a02076f89cd189d74d63492dda5b023fa85a38f"
+sunrise = "ba1f24e4ad41246b558230aa665539dc768b1287"

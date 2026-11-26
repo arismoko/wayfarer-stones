@@ -436,7 +436,7 @@ pub(crate) fn room_above(level: &dyn LevelHost, pos: mod_api::BlockPos) -> bool 
     };
     level
         .tags()
-        .block_in_tag(above.block(), keys().replaceable)
+        .block_in_tag(above.block(), keys().replaceable.typed())
         .unwrap_or(true)
 }
 
@@ -455,7 +455,7 @@ fn cell(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> Option<rules::
         "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire" => rules::Cell::Hazard,
         _ if host
             .tags()
-            .block_in_tag(state.block(), keys().replaceable)
+            .block_in_tag(state.block(), keys().replaceable.typed())
             .unwrap_or(false) =>
         {
             rules::Cell::Passable
