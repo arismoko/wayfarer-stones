@@ -49,7 +49,7 @@ pub(crate) fn register(r: &mut dyn Registrar) {
     };
     let _ = KEYS.set(keys);
     let mut payloads = r.payload_handlers();
-    let mut view = payloads.registrar("1");
+    let mut view = payloads.registrar("1").optional();
     view.play_to_server(PayloadId(rules::CHANNEL_ACT.into()), Arc::new(FromClient));
     view.play_to_client(
         PayloadId(rules::CHANNEL_LIST.into()),
@@ -436,7 +436,7 @@ pub(crate) fn room_above(level: &dyn LevelHost, pos: mod_api::BlockPos) -> bool 
     };
     level
         .tags()
-        .block_in_tag(above.block(), keys().replaceable)
+        .block_in_tag(above.block(), keys().replaceable.typed())
         .unwrap_or(true)
 }
 
@@ -455,7 +455,7 @@ fn cell(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> Option<rules::
         "minecraft:lava" | "minecraft:fire" | "minecraft:soul_fire" => rules::Cell::Hazard,
         _ if host
             .tags()
-            .block_in_tag(state.block(), keys().replaceable)
+            .block_in_tag(state.block(), keys().replaceable.typed())
             .unwrap_or(false) =>
         {
             rules::Cell::Passable
